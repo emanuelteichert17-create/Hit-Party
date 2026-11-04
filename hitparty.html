@@ -222,8 +222,8 @@ async function reveal(){
 let stream=null,scanning=false;
 async function startScan(){
   $('#reveal').hidden=true;$('#b-pause').hidden=$('#b-reveal').hidden=true;
-  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})}
-  catch{$('#status').textContent='Kamera nicht verfügbar. Nutze die Kartennummer unten.';return}
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}})}
+  catch(e){$('#status').textContent='Kamera nicht verfügbar ('+(e.name||'Fehler')+'). Nutze die Kartennummer unten.';return}
   const v=$('#cam');v.srcObject=stream;v.hidden=false;await v.play();
   scanning=true;$('#status').textContent='Halte den QR-Code ins Bild …';loop();
 }
@@ -232,11 +232,11 @@ function loop(){
   if(!scanning)return;
   const v=$('#cam'),c=$('#cv');
   if(v.readyState===4){
-    const w=Math.min(640,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);
+    const w=Math.min(1280,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);
     c.width=w;c.height=h;
     const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(v,0,0,w,h);
     const code=jsQR(x.getImageData(0,0,w,h).data,w,h);
-    if(code&&code.data.startsWith('hitparty:')){onCode(code.data.slice(9));return}
+    if(code){if(code.data.startsWith('hitparty:')){onCode(code.data.slice(9));return}$('#status').textContent='QR gefunden, aber kein Hitparty-Code: '+code.data.slice(0,40)}
   }
   requestAnimationFrame(loop);
 }
