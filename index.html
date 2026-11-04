@@ -75,14 +75,27 @@ async function api(path,opt={}){
   if(Date.now()>t.exp){await token({grant_type:'refresh_token',refresh_token:t.r});t=LS.get('tok')}
   return fetch('https://api.spotify.com/v1'+path,{...opt,headers:{Authorization:'Bearer '+t.a,'Content-Type':'application/json'}});
 }
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function playTrack(id){
   const body=JSON.stringify({uris:['spotify:track:'+id]});
-  let r=await api('/me/player/play',{method:'PUT',body});
-  if(r.status===404){
-    const d=await(await api('/me/player/devices')).json();
-    if(d.devices&&d.devices[0])r=await api('/me/player/play?device_id='+d.devices[0].id,{method:'PUT',body});
+  let dj={};try{dj=await(await api('/me/player/devices')).json()}catch{}
+  const devs=dj.devices||[];
+  const dev=devs.find(d=>d.is_active)||devs.find(d=>/smartphone|tablet/i.test(d.type))||devs[0];
+  const q=dev?'?device_id='+dev.id:'';
+  if(dev&&!dev.is_active){await api('/me/player',{method:'PUT',body:JSON.stringify({device_ids:[dev.id],play:false})});await sleep(900)}
+  const go=()=>api('/me/player/play'+q,{method:'PUT',body});
+  let r=await go();
+  for(let i=0;i<2&&!(r.ok||r.status===204);i++){await sleep(1000);r=await go()}
+  if(!(r.ok||r.status===204)){
+    let m='';try{m=(await r.json()).error.message}catch{}
+    return 'Fehler '+r.status+(m?' – '+m:'')+(dev?'':' (kein Gerät gefunden)');
   }
-  return r.ok||r.status===204;
+  await sleep(1300);
+  try{
+    const st=await api('/me/player');
+    if(st.status===200){const s=await st.json();if(!s.is_playing||!s.item||s.item.id!==id){await go();await sleep(800)}}
+  }catch{}
+  return '';
 }
 let paused=false,current=null,stream=null,scanning=false;
 async function togglePause(){
@@ -96,8 +109,8 @@ async function onCode(raw){
   stopScan();current=parse(raw);const id=current.id;paused=false;$('#reveal').hidden=true;
   $('#status').textContent='⏳ Starte Song …';
   try{
-    const ok=await playTrack(id);
-    $('#status').textContent=ok?(mode==='person'?'🎶 Song läuft! Wer hat ihn ausgesucht?':'🎶 Song läuft! Welches Jahr?'):'Kein Spotify-Gerät gefunden. Öffne die Spotify-App, starte kurz einen Song und scanne erneut.';
+    const err=await playTrack(id),ok=!err;
+    $('#status').textContent=ok?(mode==='person'?'🎶 Song läuft! Wer hat ihn ausgesucht?':'🎶 Song läuft! Welches Jahr?'):'Spotify meldet: '+err+'. Tipp: Spotify-App öffnen, einen Song starten und erneut versuchen.';
   }catch(e){$('#status').textContent=e.message}
   $('#b-pause').hidden=$('#b-reveal').hidden=false;
   $('#b-scan').textContent='📷 Nächste Karte scannen';
