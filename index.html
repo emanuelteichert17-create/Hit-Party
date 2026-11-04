@@ -38,6 +38,8 @@ code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 <button class="s" id="b-pause" hidden>⏯ Pause / Weiter</button>
 <button class="s" id="b-reveal" hidden>👀 Auflösen</button>
 <label class="chk"><input type="checkbox" id="showsong"> Interpret &amp; Titel beim Auflösen zeigen</label>
+<label class="chk"><input type="checkbox" id="webplay"> 🎧 Im Browser abspielen (Spotify-App nicht nötig)</label>
+<div id="wps" class="mut" style="font-size:13px;margin-top:4px"></div>
 <button class="s" id="b-set" style="background:none;color:var(--mut);font-size:14px">⚙ Einstellungen</button>
 </div>
 
@@ -54,7 +56,7 @@ code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 const $=s=>document.querySelector(s);
 const LS={get:(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
 const REDIR=location.origin+location.pathname;
-const SCOPES='user-modify-playback-state user-read-playback-state';
+const SCOPES='streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
 const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 
 async function login(){
@@ -84,7 +86,9 @@ async function playTrack(id){
   let dj={};try{dj=await(await api('/me/player/devices')).json()}catch(e){L.push('Geräte-Fehler: '+e.message)}
   const devs=dj.devices||[];
   L.push('Geräte: '+(devs.map(d=>d.name+' ('+d.type+(d.is_active?', aktiv':'')+(d.is_restricted?', eingeschränkt':'')+', Lautstärke '+d.volume_percent+')').join('; ')||'keine'));
-  const dev=devs.find(d=>d.is_active)||devs.find(d=>/computer|smartphone|tablet/i.test(d.type))||devs[0];
+  const useWeb=$('#webplay').checked&&webId;
+  L.push('Wiedergabe über: '+(useWeb?'Browser-Player':'Spotify-Gerät'));
+  const dev=useWeb?{id:webId,is_active:devs.some(d=>d.id===webId&&d.is_active)}:(devs.find(d=>d.is_active)||devs.find(d=>/computer|smartphone|tablet/i.test(d.type))||devs[0]);
   const q=dev?'?device_id='+dev.id:'';
   try{const tj=await(await api('/tracks/'+id+'?market=from_token')).json();L.push('Song spielbar: '+(tj.is_playable===false?'NEIN ('+((tj.restrictions&&tj.restrictions.reason)||'?')+')':'ja'))}catch(e){L.push('Song-Prüfung: '+e.message)}
   if(dev&&!dev.is_active){const t=await api('/me/player',{method:'PUT',body:JSON.stringify({device_ids:[dev.id],play:false})});L.push('Umschalten: '+t.status);await sleep(900)}
@@ -157,6 +161,17 @@ function loop(){
   requestAnimationFrame(loop);
 }
 function showSetup(on){$('#setup').style.display=on?'block':'none';$('#game').style.display=on?'none':'block';if(on)stopScan()}
+let webId=null,wp=null,sdkReady=false;
+window.onSpotifyWebPlaybackSDKReady=()=>{sdkReady=true;startWeb()};
+function startWeb(){
+  if(!sdkReady||wp||!LS.get('tok'))return;
+  wp=new Spotify.Player({name:'Hitparty (Browser)',volume:1,getOAuthToken:async cb=>{try{await api('/me/player/devices')}catch{}cb((LS.get('tok')||{}).a)}});
+  wp.addListener('ready',({device_id})=>{webId=device_id;$('#wps').textContent='🎧 Browser-Player bereit'});
+  wp.addListener('not_ready',()=>{webId=null;$('#wps').textContent='Browser-Player nicht bereit'});
+  const msgs={authentication_error:'Bitte unter ⚙ Einstellungen neu verbinden.',initialization_error:'Dieser Browser unterstützt den Browser-Player nicht.',account_error:'Spotify Premium nötig.',playback_error:'Wiedergabefehler.'};
+  Object.keys(msgs).forEach(e=>wp.addListener(e,m=>{$('#wps').textContent='⚠ '+msgs[e]+' ('+m.message+')';if(typeof L!=='undefined')L.push(e+': '+m.message)}));
+  wp.connect();
+}
 async function init(){
   $('#redir').textContent=REDIR;$('#cid').value=LS.get('cid','');
   const c=new URLSearchParams(location.search).get('code');
@@ -167,8 +182,10 @@ async function init(){
   const on=!!LS.get('tok');
   $('#conn').textContent=on?'✅ Mit Spotify verbunden':'Noch nicht verbunden';
   showSetup(!on);
+  startWeb();
 }
-$('#b-login').onclick=login;$('#b-scan').onclick=startScan;$('#b-pause').onclick=togglePause;
-$('#b-reveal').onclick=reveal;$('#m-person').onclick=()=>setMode('person');$('#m-year').onclick=()=>setMode('year');$('#showsong').checked=LS.get('showsong',false);$('#showsong').onchange=e=>LS.set('showsong',e.target.checked);setMode(mode);$('#b-set').onclick=()=>showSetup(true);$('#b-back').onclick=()=>showSetup(false);
+$('#b-login').onclick=login;$('#b-scan').onclick=()=>{if(wp&&wp.activateElement)wp.activateElement();startScan()};$('#b-pause').onclick=togglePause;
+$('#b-reveal').onclick=reveal;$('#m-person').onclick=()=>setMode('person');$('#m-year').onclick=()=>setMode('year');$('#showsong').checked=LS.get('showsong',false);$('#showsong').onchange=e=>LS.set('showsong',e.target.checked);setMode(mode);$('#webplay').checked=LS.get('webplay',true);$('#webplay').onchange=e=>LS.set('webplay',e.target.checked);$('#b-set').onclick=()=>showSetup(true);$('#b-back').onclick=()=>showSetup(false);
 init();
-</script></body></html>
+</script>
+<script src="https://sdk.scdn.co/spotify-player.js"></script></body></html>
