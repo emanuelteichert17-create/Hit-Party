@@ -43,6 +43,7 @@ code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 <div class="box">
 <video id="cam" playsinline muted hidden></video><canvas id="cv" hidden></canvas>
 <div id="status" class="st mut">Bereit. Tippe auf „Karte scannen“.</div>
+<pre id="dbg" class="mut" style="white-space:pre-wrap;font-size:12px;margin:0 0 8px"></pre>
 <div id="reveal" hidden>
 <div class="big" id="r-year"></div>
 <div class="st"><b id="r-artist"></b><br><span id="r-title"></span></div>
@@ -159,16 +160,19 @@ function render(){
 
 /* Wiedergabe */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let L=[];
 async function playTrack(id){
+  L=[];
   const body=JSON.stringify({uris:['spotify:track:'+id]});
-  let dj={};try{dj=await(await api('/me/player/devices')).json()}catch{}
+  let dj={};try{dj=await(await api('/me/player/devices')).json()}catch(e){L.push('Geräte-Fehler: '+e.message)}
   const devs=dj.devices||[];
-  const dev=devs.find(d=>d.is_active)||devs.find(d=>/smartphone|tablet/i.test(d.type))||devs[0];
+  L.push('Geräte: '+(devs.map(d=>d.name+' ('+d.type+(d.is_active?', aktiv':'')+')').join('; ')||'keine'));
+  const dev=devs.find(d=>d.is_active)||devs.find(d=>/computer|smartphone|tablet/i.test(d.type))||devs[0];
   const q=dev?'?device_id='+dev.id:'';
-  if(dev&&!dev.is_active){await api('/me/player',{method:'PUT',body:JSON.stringify({device_ids:[dev.id],play:false})});await sleep(900)}
+  if(dev&&!dev.is_active){const t=await api('/me/player',{method:'PUT',body:JSON.stringify({device_ids:[dev.id],play:false})});L.push('Umschalten: '+t.status);await sleep(900)}
   const go=()=>api('/me/player/play'+q,{method:'PUT',body});
-  let r=await go();
-  for(let i=0;i<2&&!(r.ok||r.status===204);i++){await sleep(1000);r=await go()}
+  let r=await go();L.push('Abspielen: '+r.status);
+  for(let i=0;i<2&&!(r.ok||r.status===204);i++){await sleep(1000);r=await go();L.push('Wiederholung: '+r.status)}
   if(!(r.ok||r.status===204)){
     let m='';try{m=(await r.json()).error.message}catch{}
     return 'Fehler '+r.status+(m?' – '+m:'')+(dev?'':' (kein Gerät gefunden)');
@@ -176,8 +180,12 @@ async function playTrack(id){
   await sleep(1300);
   try{
     const st=await api('/me/player');
-    if(st.status===200){const s=await st.json();if(!s.is_playing||!s.item||s.item.id!==id){await go();await sleep(800)}}
-  }catch{}
+    if(st.status===200){
+      const s=await st.json();
+      L.push('Status: '+(s.is_playing?'spielt':'pausiert')+', Lied: '+(s.item?s.item.name:'keins')+', Gerät: '+(s.device?s.device.name:'?'));
+      if(!s.is_playing||!s.item||s.item.id!==id){const r2=await go();L.push('Nochmal abspielen: '+r2.status);await sleep(800)}
+    }else L.push('Status-Abfrage: '+st.status);
+  }catch(e){L.push('Status-Fehler: '+e.message)}
   return '';
 }
 let paused=false;
@@ -193,7 +201,7 @@ async function onCode(raw){
   $('#reveal').hidden=true;
   $('#status').textContent='⏳ Starte Song …';
   try{
-    const err=await playTrack(id),ok=!err;
+    const err=await playTrack(id),ok=!err;$('#dbg').textContent=L.join('\n');
     $('#status').textContent=ok?'🎶 Song läuft! Wer oder welches Jahr?':'Spotify meldet: '+err+'. Tipp: Spotify-App öffnen, einen Song starten und erneut versuchen.';
   }catch(e){$('#status').textContent=e.message}
   $('#b-pause').hidden=$('#b-reveal').hidden=false;
