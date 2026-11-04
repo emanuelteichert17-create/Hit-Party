@@ -120,9 +120,10 @@ function parse(raw){const p=raw.split('|');return{id:p[0],name:p[1]?decodeURICom
 let mode=LS.get('mode','person');
 function setMode(m){mode=m;LS.set('mode',m);$('#m-person').classList.toggle('on',m==='person');$('#m-year').classList.toggle('on',m==='year');$('#reveal').hidden=true}
 async function onCode(raw){
-  stopScan();current=parse(raw);const id=current.id;paused=false;$('#reveal').hidden=true;
+  scanning=false;current=parse(raw);const id=current.id;paused=false;$('#reveal').hidden=true;
   const dl=+LS.get('delay',3);
   for(let i=dl;i>0;i--){$('#status').textContent='⏳ Gleich geht\'s los … '+i;await sleep(1000)}
+  stopScan();
   $('#status').textContent='⏳ Starte Song …';
   try{
     const err=await playTrack(id),ok=!err;$('#dbg').textContent=L.join('\n');
