@@ -163,7 +163,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let L=[];
 async function playTrack(id){
   L=[];
-  const body=JSON.stringify({uris:['spotify:track:'+id]});
+  const body=JSON.stringify({uris:['spotify:track:'+id],position_ms:0});
   let dj={};try{dj=await(await api('/me/player/devices')).json()}catch(e){L.push('Geräte-Fehler: '+e.message)}
   const devs=dj.devices||[];
   L.push('Geräte: '+(devs.map(d=>d.name+' ('+d.type+(d.is_active?', aktiv':'')+(d.is_restricted?', eingeschränkt':'')+', Lautstärke '+d.volume_percent+')').join('; ')||'keine'));

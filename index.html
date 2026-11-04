@@ -40,6 +40,7 @@ code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 <label class="chk"><input type="checkbox" id="showsong"> Interpret &amp; Titel beim Auflösen zeigen</label>
 <label class="chk"><input type="checkbox" id="webplay"> 🎧 Im Browser abspielen (Spotify-App nicht nötig)</label>
 <div id="wps" class="mut" style="font-size:13px;margin-top:4px"></div>
+<label class="chk">⏱ Pause nach dem Scannen <select id="delay" style="width:auto;padding:6px"><option value="0">keine</option><option value="2">2 s</option><option value="3">3 s</option><option value="5">5 s</option></select></label>
 <button class="s" id="b-set" style="background:none;color:var(--mut);font-size:14px">⚙ Einstellungen</button>
 </div>
 
@@ -82,7 +83,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let L=[];
 async function playTrack(id){
   L=[];
-  const body=JSON.stringify({uris:['spotify:track:'+id]});
+  const body=JSON.stringify({uris:['spotify:track:'+id],position_ms:0});
   let dj={};try{dj=await(await api('/me/player/devices')).json()}catch(e){L.push('Geräte-Fehler: '+e.message)}
   const devs=dj.devices||[];
   L.push('Geräte: '+(devs.map(d=>d.name+' ('+d.type+(d.is_active?', aktiv':'')+(d.is_restricted?', eingeschränkt':'')+', Lautstärke '+d.volume_percent+')').join('; ')||'keine'));
@@ -120,6 +121,8 @@ let mode=LS.get('mode','person');
 function setMode(m){mode=m;LS.set('mode',m);$('#m-person').classList.toggle('on',m==='person');$('#m-year').classList.toggle('on',m==='year');$('#reveal').hidden=true}
 async function onCode(raw){
   stopScan();current=parse(raw);const id=current.id;paused=false;$('#reveal').hidden=true;
+  const dl=+LS.get('delay',3);
+  for(let i=dl;i>0;i--){$('#status').textContent='⏳ Gleich geht\'s los … '+i;await sleep(1000)}
   $('#status').textContent='⏳ Starte Song …';
   try{
     const err=await playTrack(id),ok=!err;$('#dbg').textContent=L.join('\n');
@@ -208,7 +211,7 @@ async function init(){
   startWeb();
 }
 $('#b-login').onclick=login;$('#b-scan').onclick=()=>{if(wp&&wp.activateElement)wp.activateElement();startScan()};$('#b-pause').onclick=togglePause;
-$('#b-reveal').onclick=reveal;$('#m-person').onclick=()=>setMode('person');$('#m-year').onclick=()=>setMode('year');$('#showsong').checked=LS.get('showsong',false);$('#showsong').onchange=e=>LS.set('showsong',e.target.checked);setMode(mode);$('#webplay').checked=LS.get('webplay',true);$('#webplay').onchange=e=>LS.set('webplay',e.target.checked);$('#b-set').onclick=()=>showSetup(true);$('#b-back').onclick=()=>showSetup(false);
+$('#b-reveal').onclick=reveal;$('#m-person').onclick=()=>setMode('person');$('#m-year').onclick=()=>setMode('year');$('#showsong').checked=LS.get('showsong',false);$('#showsong').onchange=e=>LS.set('showsong',e.target.checked);setMode(mode);$('#webplay').checked=LS.get('webplay',true);$('#webplay').onchange=e=>LS.set('webplay',e.target.checked);$('#delay').value=LS.get('delay',3);$('#delay').onchange=e=>LS.set('delay',+e.target.value);$('#b-set').onclick=()=>showSetup(true);$('#b-back').onclick=()=>showSetup(false);
 init();
 </script>
 <script src="https://sdk.scdn.co/spotify-player.js"></script></body></html>
