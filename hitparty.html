@@ -33,6 +33,7 @@ code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 .card .y{font-size:26pt;font-weight:800}.card .a{font-size:11pt;font-weight:700}.card .t{font-size:10pt}
 .prev{overflow-x:auto}
 @media print{@page{margin:10mm}body{background:#fff;padding:0;max-width:none}h1,nav,.noprint{display:none!important}section{display:none!important}#t-cards{display:block!important}.prev{overflow:visible}}
+label.chk{display:flex;gap:8px;align-items:center;margin-top:12px;color:var(--mut);font-size:14px}label.chk input,label.chk select{width:auto}
 </style></head><body>
 <h1>🎵 Hitparty</h1>
 <nav class="noprint">
@@ -90,13 +91,22 @@ code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 <input id="cid" placeholder="Spotify Client ID">
 <button class="p" id="b-login">Mit Spotify verbinden</button>
 <div id="conn" class="st"></div>
+</div>
+<div class="box"><b>Spieleinstellungen</b>
+<p class="mut">Gelten für die Spielerseite auf diesem Gerät und in diesem Browser.</p>
+<label class="chk"><input type="checkbox" id="s-show"> Interpret &amp; Titel beim Auflösen zeigen</label>
+<label class="chk"><input type="checkbox" id="s-web"> 🎧 In der Spielerseite im Browser abspielen (empfohlen)</label>
+<label class="chk">⏱ Pause nach dem Scannen <select id="s-delay"><option value="0">keine</option><option value="2">2 s</option><option value="3">3 s</option><option value="5">5 s</option></select></label>
+<button class="s" id="b-player">← Zur Spielerseite</button>
 </div></section>
 
 <script>
 const $=s=>document.querySelector(s);
 const LS={get:(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
 const REDIR=location.origin+location.pathname;
-const SCOPES='user-modify-playback-state user-read-playback-state';
+const SCOPES='streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
+const ADMIN_CODE='1234'; // hier den Admin-Code ändern (gleicher Code auch in index.html / der Spielerseite)
+(function(){if(sessionStorage.getItem('adm')==='1')return;document.body.style.visibility='hidden';const c=prompt('Admin-Code:');if(c===ADMIN_CODE){sessionStorage.setItem('adm','1');document.body.style.visibility=''}else{location.replace(location.pathname.replace(/[^\/]*$/,''))}})();
 let songs=LS.get('songs',[]);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -280,6 +290,10 @@ $('#b-login').onclick=login;$('#b-add').onclick=addSongs;
 $('#b-scan').onclick=startScan;$('#b-pause').onclick=togglePause;$('#b-reveal').onclick=reveal;
 $('#b-nr').onclick=()=>{const s=songs[+$('#nr').value-1];if(s)onCode(s.id);else $('#status').textContent='Diese Nummer gibt es nicht.'};
 $('#side').onchange=render;
+$('#s-show').checked=LS.get('showsong',false);$('#s-show').onchange=e=>LS.set('showsong',e.target.checked);
+$('#s-web').checked=LS.get('webplay',true);$('#s-web').onchange=e=>LS.set('webplay',e.target.checked);
+$('#s-delay').value=LS.get('delay',3);$('#s-delay').onchange=e=>LS.set('delay',+e.target.value);
+$('#b-player').onclick=()=>{location.href=location.pathname.replace(/[^\/]*$/,'')};
 $('#b-exp').onclick=async()=>{try{await navigator.clipboard.writeText(JSON.stringify(songs));$('#addmsg').textContent='Sicherung kopiert.'}catch{prompt('Sicherung:',JSON.stringify(songs))}};
 $('#b-imp').onclick=()=>{const t=prompt('Sicherung einfügen:');if(!t)return;try{const a=JSON.parse(t);if(Array.isArray(a)){songs=a;LS.set('songs',songs);render()}}catch{alert('Ungültige Sicherung.')}};
 init();

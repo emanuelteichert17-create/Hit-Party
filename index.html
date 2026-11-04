@@ -23,6 +23,7 @@ code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 .seg{display:flex;gap:6px;margin-bottom:10px}.seg button{flex:1;padding:12px;border:0;border-radius:10px;background:#2d2849;color:var(--mut);font-weight:700;font-size:15px}.seg button.on{background:var(--ac);color:#fff}label.chk{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:14px;margin-top:12px}label.chk input{width:auto}
 #ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(20,18,31,.6);border-radius:14px;text-align:center;font-weight:800;pointer-events:none}
 #ov[hidden]{display:none}
+#dbg,#wps{display:none}
 #setup{display:none}
 </style></head><body>
 <h1>🎵 Hitparty</h1>
@@ -39,11 +40,13 @@ code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 <button class="p" id="b-scan">📷 Karte scannen</button>
 <button class="s" id="b-pause" hidden>⏯ Pause / Weiter</button>
 <button class="s" id="b-reveal" hidden>👀 Auflösen</button>
+<div hidden>
 <label class="chk"><input type="checkbox" id="showsong"> Interpret &amp; Titel beim Auflösen zeigen</label>
 <label class="chk"><input type="checkbox" id="webplay"> 🎧 Im Browser abspielen (Spotify-App nicht nötig)</label>
 <div id="wps" class="mut" style="font-size:13px;margin-top:4px"></div>
 <label class="chk">⏱ Pause nach dem Scannen <select id="delay" style="width:auto;padding:6px"><option value="0">keine</option><option value="2">2 s</option><option value="3">3 s</option><option value="5">5 s</option></select></label>
-<button class="s" id="b-set" style="background:none;color:var(--mut);font-size:14px">⚙ Einstellungen</button>
+</div>
+<button class="s" id="b-admin" style="background:none;color:var(--mut);font-size:14px">🔒 Admin</button>
 </div>
 
 <div class="box" id="setup">
@@ -60,6 +63,7 @@ const $=s=>document.querySelector(s);
 const LS={get:(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
 const REDIR=location.origin+location.pathname;
 const SCOPES='streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
+const ADMIN_CODE='1234'; // hier den Admin-Code ändern (gleicher Code auch in hitparty.html)
 const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 
 async function login(){
@@ -77,7 +81,7 @@ async function token(body){
   LS.set('tok',{a:j.access_token,r:j.refresh_token||(LS.get('tok',{}).r),exp:Date.now()+j.expires_in*1000-30000});
 }
 async function api(path,opt={}){
-  let t=LS.get('tok'); if(!t)throw new Error('Nicht mit Spotify verbunden (⚙ Einstellungen).');
+  let t=LS.get('tok'); if(!t)throw new Error('Nicht mit Spotify verbunden. Bitte die Spielleitung fragen (🔒 Admin).');
   if(Date.now()>t.exp){await token({grant_type:'refresh_token',refresh_token:t.r});t=LS.get('tok')}
   return fetch('https://api.spotify.com/v1'+path,{...opt,headers:{Authorization:'Bearer '+t.a,'Content-Type':'application/json'}});
 }
@@ -131,7 +135,7 @@ async function onCode(raw){
   $('#status').textContent='⏳ Starte Song …';
   try{
     const err=await playTrack(id),ok=!err;$('#dbg').textContent=L.join('\n');
-    $('#status').textContent=ok?(mode==='person'?'🎶 Song läuft! Wer hat ihn ausgesucht?':'🎶 Song läuft! Welches Jahr?'):'Spotify meldet: '+err+'. Tipp: Spotify-App öffnen, einen Song starten und erneut versuchen.';
+    $('#status').textContent=ok?(mode==='person'?'🎶 Song läuft! Wer hat ihn ausgesucht?':'🎶 Song läuft! Welches Jahr?'):'Der Song konnte nicht gestartet werden. Bitte die Spielleitung fragen.';
   }catch(e){$('#status').textContent=e.message}
   $('#b-pause').hidden=$('#b-reveal').hidden=false;
   $('#b-scan').textContent='📷 Nächste Karte scannen';
@@ -185,10 +189,10 @@ async function loop(){
       if(!scanning)return;
       if(data){
         if(data.startsWith('hitparty:')){onCode(data.slice(9));return}
-        $('#status').textContent='QR gefunden, aber kein Hitparty-Code: '+data.slice(0,40);
-      }else if(frames%15===0){$('#status').textContent='Suche Code … ('+v.videoWidth+'×'+v.videoHeight+', '+(bd?'nativ':'Software')+', Bild '+frames+')'}
+        $('#status').textContent='Das ist kein Hitparty-Code.';
+      }else if(frames%15===0){$('#status').textContent='🔍 Suche Code …'}
     }
-  }catch(e){$('#status').textContent='Scanfehler: '+e.message}
+  }catch(e){$('#status').textContent='Scanfehler. Bitte noch einmal versuchen.'}
   if(scanning)requestAnimationFrame(loop);
 }
 function showSetup(on){$('#setup').style.display=on?'block':'none';$('#game').style.display=on?'none':'block';if(on)stopScan()}
@@ -212,11 +216,11 @@ async function init(){
   }
   const on=!!LS.get('tok');
   $('#conn').textContent=on?'✅ Mit Spotify verbunden':'Noch nicht verbunden';
-  showSetup(!on);
+  if(!on)$('#status').textContent='Noch nicht mit Spotify verbunden. Bitte die Spielleitung fragen (🔒 Admin).';
   startWeb();
 }
 $('#b-login').onclick=login;$('#b-scan').onclick=()=>{if(wp&&wp.activateElement)wp.activateElement();startScan()};$('#b-pause').onclick=togglePause;
-$('#b-reveal').onclick=reveal;$('#m-person').onclick=()=>setMode('person');$('#m-year').onclick=()=>setMode('year');$('#showsong').checked=LS.get('showsong',false);$('#showsong').onchange=e=>LS.set('showsong',e.target.checked);setMode(mode);$('#webplay').checked=LS.get('webplay',true);$('#webplay').onchange=e=>LS.set('webplay',e.target.checked);$('#delay').value=LS.get('delay',3);$('#delay').onchange=e=>LS.set('delay',+e.target.value);$('#b-set').onclick=()=>showSetup(true);$('#b-back').onclick=()=>showSetup(false);
+$('#b-reveal').onclick=reveal;$('#m-person').onclick=()=>setMode('person');$('#m-year').onclick=()=>setMode('year');$('#showsong').checked=LS.get('showsong',false);$('#showsong').onchange=e=>LS.set('showsong',e.target.checked);setMode(mode);$('#webplay').checked=LS.get('webplay',true);$('#webplay').onchange=e=>LS.set('webplay',e.target.checked);$('#delay').value=LS.get('delay',3);$('#delay').onchange=e=>LS.set('delay',+e.target.value);$('#b-admin').onclick=()=>{const c=prompt('Admin-Code:');if(c===null)return;if(c===ADMIN_CODE){sessionStorage.setItem('adm','1');location.href='hitparty.html'}else alert('Falscher Code.')};$('#b-back').onclick=()=>showSetup(false);
 init();
 </script>
 <script src="https://sdk.scdn.co/spotify-player.js"></script></body></html>
