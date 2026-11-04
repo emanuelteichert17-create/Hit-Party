@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hitparty</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+:root{--bg:#14121f;--card:#1f1b33;--tx:#f4f1ff;--mut:#a39cc4;--ac:#ff4fa3;--ac2:#ffb703;--ok:#3ddc97}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,sans-serif;padding:0 14px 40px;max-width:640px;margin:auto}
+h1{font-size:22px;margin:16px 0 8px;background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
+nav{display:flex;gap:6px;margin-bottom:14px}
+nav button{flex:1;padding:10px 4px;border:0;border-radius:10px;background:var(--card);color:var(--mut);font-weight:600}
+nav button.on{background:var(--ac);color:#fff}
+section{display:none}section.on{display:block}
+.box{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+button.p{background:var(--ac);color:#fff;border:0;border-radius:12px;padding:13px 16px;font-size:16px;font-weight:700;width:100%;margin-top:8px}
+button.s{background:#2d2849;color:var(--tx);border:0;border-radius:12px;padding:12px;font-weight:600;width:100%;margin-top:8px}
+input,textarea,select{width:100%;background:#120f20;color:var(--tx);border:1px solid #3a3459;border-radius:10px;padding:10px;font-size:16px}
+textarea{min-height:90px}
+.mut{color:var(--mut);font-size:14px}
+.row{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #2d2849}
+.row input{width:80px}.row input.n{width:95px}.grow{flex:1;min-width:0;font-size:14px}
+.x{background:none;border:0;color:var(--mut);font-size:18px}
+video{width:100%;border-radius:14px;background:#000;max-height:50vh;object-fit:cover}
+.big{font-size:44px;font-weight:800;color:var(--ac2);text-align:center}
+.st{text-align:center;font-size:18px;margin:10px 0}
+code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
+#cards{display:grid;grid-template-columns:repeat(3,60mm);gap:3mm;justify-content:center}
+#cards.back{direction:rtl}
+.card{width:60mm;height:60mm;background:#fff;color:#000;border:1px dashed #999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5mm;text-align:center;direction:ltr}
+.card svg{width:42mm;height:42mm}.card small{font-size:9pt;margin-top:2mm}
+.card .y{font-size:26pt;font-weight:800}.card .a{font-size:11pt;font-weight:700}.card .t{font-size:10pt}
+.prev{overflow-x:auto}
+@media print{@page{margin:10mm}body{background:#fff;padding:0;max-width:none}h1,nav,.noprint{display:none!important}section{display:none!important}#t-cards{display:block!important}.prev{overflow:visible}}
+</style></head><body>
+<h1>🎵 Hitparty</h1>
+<nav class="noprint">
+<button data-t="play">Spielen</button><button data-t="songs">Songs</button><button data-t="cards">Karten</button><button data-t="setup">Einrichtung</button>
+</nav>
+
+<section id="t-play">
+<div class="box">
+<video id="cam" playsinline muted hidden></video><canvas id="cv" hidden></canvas>
+<div id="status" class="st mut">Bereit. Tippe auf „Karte scannen“.</div>
+<div id="reveal" hidden>
+<div class="big" id="r-year"></div>
+<div class="st"><b id="r-artist"></b><br><span id="r-title"></span></div>
+</div>
+<button class="p" id="b-scan">📷 Karte scannen</button>
+<button class="s" id="b-pause" hidden>⏯ Pause / Weiter</button>
+<button class="s" id="b-reveal" hidden>👀 Auflösen</button>
+<div style="display:flex;gap:8px;margin-top:8px"><input id="nr" type="number" placeholder="oder Kartennummer"><button class="s" id="b-nr" style="width:auto;margin:0">▶</button></div>
+</div>
+</section>
+
+<section id="t-songs">
+<div class="box">
+<b>Songs hinzufügen</b> <span class="mut">(Name gilt für alle Links unten)</span>
+<p class="mut">Spotify-Links einfügen (Song → Teilen → Link kopieren), mehrere untereinander. Titel, Interpret und Jahr werden automatisch geholt.</p>
+<input id="who" placeholder="Name des Spielers (z. B. Anna)" style="margin-bottom:8px"><textarea id="links" placeholder="https://open.spotify.com/track/..."></textarea>
+<button class="p" id="b-add">Hinzufügen</button>
+<div id="addmsg" class="mut"></div>
+</div>
+<div class="box"><div id="list"></div>
+<p class="mut">Das Jahr kommt vom Album. Bei Sammlern/Neuauflagen bitte korrigieren.</p>
+<button class="s" id="b-exp">Sicherung kopieren</button><button class="s" id="b-imp">Sicherung einspielen</button></div>
+</section>
+
+<section id="t-cards">
+<div class="box noprint">
+<select id="side"><option value="front">Vorderseiten (QR-Codes)</option><option value="back">Rückseiten (Lösung)</option></select>
+<button class="p" onclick="window.print()">🖨 Drucken</button>
+<p class="mut">12 Karten pro A4-Seite (60 mm). Erst Vorderseiten drucken, Blatt wenden (Doppelseitig: lange Kante), dann Rückseiten drucken. Skalierung auf 100 % stellen.</p>
+</div>
+<div class="prev"><div id="cards"></div></div>
+</section>
+
+<section id="t-setup">
+<div class="box">
+<b>Einmalige Einrichtung</b>
+<ol class="mut">
+<li>Diese Datei muss unter einer <b>https</b>-Adresse laufen (z. B. GitHub Pages), sonst geht weder Kamera noch Login.</li>
+<li>Auf <code>developer.spotify.com/dashboard</code> eine App anlegen, API „Web API“ wählen.</li>
+<li>Als Redirect URI genau diese Adresse eintragen:<br><code id="redir"></code></li>
+<li>Die <b>Client ID</b> hier einfügen und verbinden.</li>
+<li>Vor dem Spielen die Spotify-App öffnen und kurz einen Song starten.</li>
+</ol>
+<input id="cid" placeholder="Spotify Client ID">
+<button class="p" id="b-login">Mit Spotify verbinden</button>
+<div id="conn" class="st"></div>
+</div></section>
+
+<script>
+const $=s=>document.querySelector(s);
+const LS={get:(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
+const REDIR=location.origin+location.pathname;
+const SCOPES='user-modify-playback-state user-read-playback-state';
+let songs=LS.get('songs',[]);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* Tabs */
+function tab(t){document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='t-'+t));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));if(t!=='play')stopScan()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
+
+/* Auth (PKCE) */
+const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+async function login(){
+  const id=$('#cid').value.trim(); if(!id)return alert('Bitte Client ID eintragen.');
+  LS.set('cid',id);
+  const v=b64(crypto.getRandomValues(new Uint8Array(32)));
+  localStorage.setItem('verifier',v);
+  const ch=b64(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));
+  location.href='https://accounts.spotify.com/authorize?'+new URLSearchParams({client_id:id,response_type:'code',redirect_uri:REDIR,scope:SCOPES,code_challenge_method:'S256',code_challenge:ch});
+}
+async function token(body){
+  const r=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:LS.get('cid',''),...body})});
+  const j=await r.json();
+  if(!j.access_token)throw new Error(j.error_description||'Login fehlgeschlagen');
+  LS.set('tok',{a:j.access_token,r:j.refresh_token||(LS.get('tok',{}).r),exp:Date.now()+j.expires_in*1000-30000});
+}
+async function api(path,opt={}){
+  let t=LS.get('tok'); if(!t)throw new Error('Nicht mit Spotify verbunden.');
+  if(Date.now()>t.exp){await token({grant_type:'refresh_token',refresh_token:t.r});t=LS.get('tok')}
+  return fetch('https://api.spotify.com/v1'+path,{...opt,headers:{Authorization:'Bearer '+t.a,'Content-Type':'application/json'}});
+}
+
+/* Songs */
+async function addSongs(){
+  const ids=[...new Set([...$('#links').value.matchAll(/(?:track\/|spotify:track:)([A-Za-z0-9]{22})/g)].map(m=>m[1]))];
+  if(!ids.length){$('#addmsg').textContent='Keine Spotify-Song-Links gefunden.';return}
+  let n=0,bad=0;
+  try{
+    for(const id of ids){
+      if(songs.some(s=>s.id===id))continue;
+      const r=await api('/tracks/'+id);
+      if(!r.ok){bad++;continue}
+      const j=await r.json();
+      songs.push({id,player:$('#who').value.trim(),title:j.name,artist:j.artists.map(a=>a.name).join(', '),year:+j.album.release_date.slice(0,4)});n++;
+    }
+  }catch(e){$('#addmsg').textContent=e.message;return}
+  LS.set('songs',songs);$('#links').value='';$('#who').value='';render();
+  $('#addmsg').textContent=n+' hinzugefügt'+(bad?', '+bad+' fehlgeschlagen':'')+'.';
+}
+function setName(i,v){songs[i].player=v.trim();LS.set('songs',songs);render()}
+function setYear(i,v){songs[i].year=+v;LS.set('songs',songs);render()}
+function del(i){if(confirm('Song entfernen? Die Nummern der Karten danach verschieben sich.')){songs.splice(i,1);LS.set('songs',songs);render()}}
+const qrData=s=>'hitparty:'+s.id+'|'+encodeURIComponent(s.player||'')+'|'+s.year;
+function render(){
+  $('#list').innerHTML=songs.map((s,i)=>`<div class="row"><b>${i+1}</b><div class="grow">${esc(s.artist)} – ${esc(s.title)}</div><input class="n" placeholder="Name" value="${esc(s.player||'')}" onchange="setName(${i},this.value)"><input type="number" value="${s.year}" onchange="setYear(${i},this.value)"><button class="x" onclick="del(${i})">✕</button></div>`).join('')||'<p class="mut">Noch keine Songs.</p>';
+  const back=$('#side').value==='back';
+  $('#cards').className=back?'back':'';
+  $('#cards').innerHTML=songs.map((s,i)=>{
+    if(back)return `<div class="card"><div class="a">${esc(s.player||'')}</div><div class="y">${s.year}</div><div class="a">${esc(s.artist)}</div><div class="t">${esc(s.title)}</div><small>#${i+1}</small></div>`;
+    const q=qrcode(0,'M');q.addData(qrData(s));q.make();
+    return `<div class="card">${q.createSvgTag({cellSize:4,margin:0,scalable:true})}<small>#${i+1}</small></div>`;
+  }).join('');
+}
+
+/* Wiedergabe */
+async function playTrack(id){
+  const body=JSON.stringify({uris:['spotify:track:'+id]});
+  let r=await api('/me/player/play',{method:'PUT',body});
+  if(r.status===404){
+    const d=await(await api('/me/player/devices')).json();
+    if(d.devices&&d.devices[0])r=await api('/me/player/play?device_id='+d.devices[0].id,{method:'PUT',body});
+  }
+  return r.status===204||r.ok;
+}
+let paused=false;
+async function togglePause(){
+  const r=await api(paused?'/me/player/play':'/me/player/pause',{method:'PUT'});
+  if(r.ok||r.status===204)paused=!paused;
+}
+let current=null;
+async function onCode(raw){
+  stopScan();
+  const id=raw.split('|')[0];
+  current=id;paused=false;
+  $('#reveal').hidden=true;
+  $('#status').textContent='⏳ Starte Song …';
+  try{
+    const ok=await playTrack(id);
+    $('#status').textContent=ok?'🎶 Song läuft! Wer oder welches Jahr?':'Kein Spotify-Gerät gefunden. Öffne die Spotify-App, starte kurz einen Song und scanne erneut.';
+  }catch(e){$('#status').textContent=e.message}
+  $('#b-pause').hidden=$('#b-reveal').hidden=false;
+  $('#b-scan').textContent='📷 Nächste Karte scannen';
+}
+async function reveal(){
+  let s=songs.find(x=>x.id===current);
+  if(!s){
+    try{const j=await(await api('/tracks/'+current)).json();s={artist:j.artists.map(a=>a.name).join(', '),title:j.name,year:+j.album.release_date.slice(0,4)}}catch{return}
+  }
+  $('#r-year').textContent=s.year+' · '+Math.floor(s.year/10)*10+'er';
+  $('#r-artist').textContent=(s.player?s.player+' · ':'')+s.artist;$('#r-title').textContent=s.title;
+  $('#reveal').hidden=false;
+}
+
+/* Scannen */
+let stream=null,scanning=false;
+async function startScan(){
+  $('#reveal').hidden=true;$('#b-pause').hidden=$('#b-reveal').hidden=true;
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})}
+  catch{$('#status').textContent='Kamera nicht verfügbar. Nutze die Kartennummer unten.';return}
+  const v=$('#cam');v.srcObject=stream;v.hidden=false;await v.play();
+  scanning=true;$('#status').textContent='Halte den QR-Code ins Bild …';loop();
+}
+function stopScan(){scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#cam').hidden=true}
+function loop(){
+  if(!scanning)return;
+  const v=$('#cam'),c=$('#cv');
+  if(v.readyState===4){
+    const w=Math.min(640,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);
+    c.width=w;c.height=h;
+    const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(v,0,0,w,h);
+    const code=jsQR(x.getImageData(0,0,w,h).data,w,h);
+    if(code&&code.data.startsWith('hitparty:')){onCode(code.data.slice(9));return}
+  }
+  requestAnimationFrame(loop);
+}
+
+/* Init */
+async function init(){
+  $('#redir').textContent=REDIR;$('#cid').value=LS.get('cid','');
+  const c=new URLSearchParams(location.search).get('code');
+  if(c){
+    history.replaceState({},'',REDIR);
+    try{await token({grant_type:'authorization_code',code:c,redirect_uri:REDIR,code_verifier:localStorage.getItem('verifier')})}catch(e){alert(e.message)}
+  }
+  const on=!!LS.get('tok');
+  $('#conn').textContent=on?'✅ Mit Spotify verbunden':'Noch nicht verbunden';
+  render();tab(on?'play':'setup');
+}
+$('#b-login').onclick=login;$('#b-add').onclick=addSongs;
+$('#b-scan').onclick=startScan;$('#b-pause').onclick=togglePause;$('#b-reveal').onclick=reveal;
+$('#b-nr').onclick=()=>{const s=songs[+$('#nr').value-1];if(s)onCode(s.id);else $('#status').textContent='Diese Nummer gibt es nicht.'};
+$('#side').onchange=render;
+$('#b-exp').onclick=async()=>{try{await navigator.clipboard.writeText(JSON.stringify(songs));$('#addmsg').textContent='Sicherung kopiert.'}catch{prompt('Sicherung:',JSON.stringify(songs))}};
+$('#b-imp').onclick=()=>{const t=prompt('Sicherung einfügen:');if(!t)return;try{const a=JSON.parse(t);if(Array.isArray(a)){songs=a;LS.set('songs',songs);render()}}catch{alert('Ungültige Sicherung.')}};
+init();
+</script></body></html>
