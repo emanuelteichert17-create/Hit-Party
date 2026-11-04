@@ -166,9 +166,10 @@ async function playTrack(id){
   const body=JSON.stringify({uris:['spotify:track:'+id]});
   let dj={};try{dj=await(await api('/me/player/devices')).json()}catch(e){L.push('Geräte-Fehler: '+e.message)}
   const devs=dj.devices||[];
-  L.push('Geräte: '+(devs.map(d=>d.name+' ('+d.type+(d.is_active?', aktiv':'')+')').join('; ')||'keine'));
+  L.push('Geräte: '+(devs.map(d=>d.name+' ('+d.type+(d.is_active?', aktiv':'')+(d.is_restricted?', eingeschränkt':'')+', Lautstärke '+d.volume_percent+')').join('; ')||'keine'));
   const dev=devs.find(d=>d.is_active)||devs.find(d=>/computer|smartphone|tablet/i.test(d.type))||devs[0];
   const q=dev?'?device_id='+dev.id:'';
+  try{const tj=await(await api('/tracks/'+id+'?market=from_token')).json();L.push('Song spielbar: '+(tj.is_playable===false?'NEIN ('+((tj.restrictions&&tj.restrictions.reason)||'?')+')':'ja'))}catch(e){L.push('Song-Prüfung: '+e.message)}
   if(dev&&!dev.is_active){const t=await api('/me/player',{method:'PUT',body:JSON.stringify({device_ids:[dev.id],play:false})});L.push('Umschalten: '+t.status);await sleep(900)}
   const go=()=>api('/me/player/play'+q,{method:'PUT',body});
   let r=await go();L.push('Abspielen: '+r.status);
