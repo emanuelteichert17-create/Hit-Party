@@ -148,15 +148,27 @@ async function startScan(){
   scanning=true;$('#status').textContent='Halte den QR-Code ins Bild …';loop();
 }
 function stopScan(){scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#cam').hidden=true}
-function loop(){
+const bd=('BarcodeDetector' in window)?new BarcodeDetector({formats:['qr_code']}):null;
+let frames=0;
+async function loop(){
   if(!scanning)return;
   const v=$('#cam'),c=$('#cv');
-  if(v.readyState===4){
-    const w=Math.min(1280,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);
-    c.width=w;c.height=h;
-    const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(v,0,0,w,h);
-    const code=jsQR(x.getImageData(0,0,w,h).data,w,h);
-    if(code){if(code.data.startsWith('hitparty:')){onCode(code.data.slice(9));return}$('#status').textContent='QR gefunden, aber kein Hitparty-Code: '+code.data.slice(0,40)}
+  if(v.readyState>=2&&v.videoWidth){
+    frames++;
+    let data=null;
+    try{if(bd){const r=await bd.detect(v);if(r.length)data=r[0].rawValue}}catch(e){}
+    if(!data&&scanning){
+      const w=Math.min(frames%2?960:480,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);
+      c.width=w;c.height=h;
+      const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(v,0,0,w,h);
+      const code=jsQR(x.getImageData(0,0,w,h).data,w,h);
+      if(code)data=code.data;
+    }
+    if(!scanning)return;
+    if(data){
+      if(data.startsWith('hitparty:')){onCode(data.slice(9));return}
+      $('#status').textContent='QR gefunden, aber kein Hitparty-Code: '+data.slice(0,40);
+    }else if(frames%15===0){$('#status').textContent='Suche Code … ('+v.videoWidth+'×'+v.videoHeight+', '+(bd?'nativ':'Software')+')'}
   }
   requestAnimationFrame(loop);
 }
