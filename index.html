@@ -21,13 +21,15 @@ video{width:100%;border-radius:14px;background:#000;max-height:55vh;object-fit:c
 .big{font-size:46px;font-weight:800;color:var(--ac2);text-align:center}
 code{background:#120f20;padding:2px 5px;border-radius:5px;word-break:break-all}
 .seg{display:flex;gap:6px;margin-bottom:10px}.seg button{flex:1;padding:12px;border:0;border-radius:10px;background:#2d2849;color:var(--mut);font-weight:700;font-size:15px}.seg button.on{background:var(--ac);color:#fff}label.chk{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:14px;margin-top:12px}label.chk input{width:auto}
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(20,18,31,.6);border-radius:14px;text-align:center;font-weight:800;pointer-events:none}
+#ov[hidden]{display:none}
 #setup{display:none}
 </style></head><body>
 <h1>🎵 Hitparty</h1>
 
 <div class="box" id="game">
 <div class="seg"><button id="m-person">👤 Wer hat's ausgesucht?</button><button id="m-year">📅 Welches Jahr?</button></div>
-<video id="cam" playsinline muted hidden></video><canvas id="cv" hidden></canvas>
+<div style="position:relative"><video id="cam" playsinline muted hidden></video><div id="ov" hidden></div></div><canvas id="cv" hidden></canvas>
 <div id="status" class="st mut">Bereit.</div>
 <pre id="dbg" class="mut" style="white-space:pre-wrap;font-size:12px;margin:0 0 8px"></pre>
 <div id="reveal" hidden>
@@ -122,7 +124,9 @@ function setMode(m){mode=m;LS.set('mode',m);$('#m-person').classList.toggle('on'
 async function onCode(raw){
   scanning=false;current=parse(raw);const id=current.id;paused=false;$('#reveal').hidden=true;
   const dl=+LS.get('delay',3);
-  for(let i=dl;i>0;i--){$('#status').textContent='⏳ Gleich geht\'s los … '+i;await sleep(1000)}
+  $('#ov').hidden=false;
+  for(let i=dl;i>0;i--){$('#ov').innerHTML='<div style="font-size:20px">Gleich geht\'s los …</div><div style="font-size:84px;line-height:1.1;color:var(--ac2)">'+i+'</div>';$('#status').textContent='✅ Song erkannt';await sleep(1000)}
+  $('#ov').hidden=true;
   stopScan();
   $('#status').textContent='⏳ Starte Song …';
   try{
@@ -151,7 +155,7 @@ async function startScan(){
   const v=$('#cam');v.srcObject=stream;v.hidden=false;v.onclick=refocus;await v.play();frames=0;refocus();
   scanning=true;$('#status').textContent='Halte den QR-Code ins Bild … (Tipp aufs Bild stellt scharf)';loop();
 }
-function stopScan(){scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#cam').hidden=true}
+function stopScan(){scanning=false;$('#ov').hidden=true;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#cam').hidden=true}
 const bd=('BarcodeDetector' in window)?new BarcodeDetector({formats:['qr_code']}):null;
 let frames=0;
 async function refocus(){
